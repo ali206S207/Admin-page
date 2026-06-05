@@ -368,7 +368,7 @@ function renderList(list) {
     html += '<button class="btn-a" onclick="openEdit('+i+')">تعديل</button>';
     html += '<button class="btn-a renew" onclick="openRenew('+i+')">تجديد</button>';
     if (d >= 0 && d <= 7) { html += '<button class="btn-a wa" onclick="remindMember('+i+')">تذكير واتساب</button>'; }
-    if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpired(members[i])">إشعار الانتهاء</button>'; }
+    if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpired('+i+')">إشعار الانتهاء</button>'; }
     if (m.fingerprint) { html += '<button class="btn-a blue" onclick="resetDev(\''+m.id+'\')">فك الجهاز</button>'; }
     html += '<button class="btn-a danger" onclick="delMember(\''+m.id+'\')">حذف</button>';
     html += '</div></div>';
@@ -472,7 +472,8 @@ function sendRenewal(m) {
   waOpen(m.phone, text);
 }
 
-function sendExpired(m) {
+function sendExpired(i) {
+  var m = members[i];
   var text = buildMsg([
     'السلام عليكم ورحمة الله ' + m.name + ' 👋',
     'نُعلمكم بأن اشتراككم في *TEFA GYM* قد انتهى.',
