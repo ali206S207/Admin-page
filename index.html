@@ -367,8 +367,8 @@ function renderList(list) {
     html += '<div class="mcard-actions">';
     html += '<button class="btn-a" onclick="openEdit('+i+')">تعديل</button>';
     html += '<button class="btn-a renew" onclick="openRenew('+i+')">تجديد</button>';
-    if (d >= 0 && d <= 7) { html += '<button class="btn-a wa" onclick="remindMember('+i+')">تذكير واتساب</button>'; }
-    if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpired('+i+')">إشعار الانتهاء</button>'; }
+    if (d >= 0 && d <= 7) { html += '<button class="btn-a wa" onclick="remindMemberById(\''+m.id+'\')">تذكير واتساب</button>'; }
+    if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpiredById(\''+m.id+'\')">إشعار الانتهاء</button>'; }
     if (m.fingerprint) { html += '<button class="btn-a blue" onclick="resetDev(\''+m.id+'\')">فك الجهاز</button>'; }
     html += '<button class="btn-a danger" onclick="delMember(\''+m.id+'\')">حذف</button>';
     html += '</div></div>';
@@ -408,6 +408,13 @@ function exportCSV() {
 function waOpen(phone, text) { window.open('https://wa.me/'+phone.replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(text),'_blank'); }
 
 function buildMsg(lines) { return lines.join('\n'); }
+
+function getMemberById(id) {
+  for (var j = 0; j < members.length; j++) { if (members[j].id === id) return members[j]; }
+  return null;
+}
+function remindMemberById(id) { var m = getMemberById(id); if (m) { var i = members.indexOf(m); remindMember(i); } }
+function sendExpiredById(id) { var m = getMemberById(id); if (m) sendExpired(members.indexOf(m)); }
 
 function remindMember(i) {
   var m = members[i];
