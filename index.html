@@ -147,7 +147,7 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
   </div>
   <div class="stats2">
     <div class="stat"><div class="stat-n" id="sToday" style="color:var(--info)">0</div><div class="stat-l">انضموا اليوم</div></div>
-    <div class="stat"><div class="stat-n" id="sRevenue" style="color:var(--success);font-size:1.2rem">0</div><div class="stat-l">ايرادات الشهر (جنيه)</div></div>
+    <div class="stat"><div class="stat-n" id="sRevenue" style="color:var(--success);font-size:1.2rem">0</div><div class="stat-l">إجمالي إيرادات النشطين</div></div>
   </div>
   <div class="section" id="alertsSection" style="display:none">
     <div class="section-head">
@@ -214,8 +214,8 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
     <input type="hidden" id="rId">
     <div class="cur-info"><div class="cur-label">الاشتراك الحالي</div><div class="cur-val" id="rCurInfo">-</div></div>
     <div class="fg"><label>الباقة الجديدة</label><select id="rPackage" onchange="calcRenew()"><option value="">اختر الباقة</option></select></div>
-    <div class="hint hint-green" id="rHint"></div>
-    <div class="fg"><label>تاريخ الانتهاء الجديد</label><input type="date" id="rEnd" readonly style="opacity:.5"></div>
+    <div class="fg"><label>تاريخ البداية الجديد</label><input type="date" id="rStart" onchange="calcRenew()"></div>
+    <div class="fg"><label>تاريخ الانتهاء الجديد</label><input type="date" id="rEnd"></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAll()">الغاء</button>
       <button class="btn-confirm green" onclick="saveRenew()">تجديد وارسال واتساب</button>
@@ -277,20 +277,22 @@ async function loadData() {
 
 function render() {
   var today = new Date(); today.setHours(0,0,0,0);
-  var active=0, expiring=0, expired=0, todayCount=0, revenue=0;
+  var active=0, expiring=0, expired=0, todayCount=0, totalRevenue=0;
 
   members.forEach(function(m) {
     var d=dl(m.end_date);
     if(d < 0) expired++;
     else if(d <= 7) expiring++;
     else active++;
-    // today signups
-    var created = m.code_used_at ? new Date(m.code_used_at) : null;
-    if (created) { var c=new Date(created); c.setHours(0,0,0,0); if(c.getTime()===today.getTime()) todayCount++; }
-    // revenue this month
-    var start = new Date(m.start_date);
-    if (start.getMonth()===today.getMonth() && start.getFullYear()===today.getFullYear()) {
-      revenue += (m.gym_packages && m.gym_packages.price) ? m.gym_packages.price : 0;
+
+    // انضم اليوم - بناءً على code_used_at او start_date
+    var joinDate = m.code_used_at ? new Date(m.code_used_at) : new Date(m.start_date);
+    joinDate.setHours(0,0,0,0);
+    if(joinDate.getTime() === today.getTime()) todayCount++;
+
+    // إجمالي الإيرادات - كل الأعضاء النشطين (اشتراك لسه ما خلصش)
+    if(d >= 0 && m.gym_packages && m.gym_packages.price) {
+      totalRevenue += m.gym_packages.price;
     }
   });
 
@@ -299,7 +301,7 @@ function render() {
   document.getElementById('sExpiring').textContent = expiring;
   document.getElementById('sExpired').textContent = expired;
   document.getElementById('sToday').textContent = todayCount;
-  document.getElementById('sRevenue').textContent = revenue.toLocaleString('ar-EG');
+  document.getElementById('sRevenue').textContent = totalRevenue.toLocaleString('ar-EG');
 
   // duplicate phone check
   var phones = {}, dups = [];
@@ -580,20 +582,19 @@ function openRenew(i) {
   var opts='<option value="">اختر الباقة</option>';
   pkgs.forEach(function(p){opts+='<option value="'+p.id+'" data-days="'+getDays(p)+'"'+(p.id===m.package_id?' selected':'')+'>'+p.name+' - '+p.price+' جنيه</option>';});
   document.getElementById('rPackage').innerHTML=opts;
-  document.getElementById('rEnd').value=''; document.getElementById('rHint').style.display='none';
+  document.getElementById('rStart').value=new Date().toISOString().split('T')[0];
+  document.getElementById('rEnd').value='';
   calcRenew();
   document.getElementById('renewModal').classList.add('open');
 }
 function calcRenew() {
-  var m=members[renewIdx]; if(!m) return;
   var sel=document.getElementById('rPackage');
-  var d=parseInt((sel.options[sel.selectedIndex]&&sel.options[sel.selectedIndex].dataset.days)||0); if(!d) return;
-  var base=dl(m.end_date)>=0?new Date(m.end_date):new Date();
+  var d=parseInt((sel.options[sel.selectedIndex]&&sel.options[sel.selectedIndex].dataset.days)||0);
+  var start=document.getElementById('rStart').value;
+  if(!d||!start) return;
+  var base=new Date(start);
   base.setHours(0,0,0,0); base.setDate(base.getDate()+d);
   document.getElementById('rEnd').value=base.toISOString().split('T')[0];
-  var h=document.getElementById('rHint');
-  h.textContent=dl(m.end_date)>=0?'هيتجدد من '+fmt(m.end_date)+' - الايام الباقية مش بتتضيع':'الاشتراك منتهي - التجديد هيبدا من النهارده';
-  h.style.display='block';
 }
 async function saveRenew() {
   var m=members[renewIdx];
@@ -601,7 +602,8 @@ async function saveRenew() {
   var pkgId=document.getElementById('rPackage').value;
   var end=document.getElementById('rEnd').value;
   if(!pkgId||!end){toast('اختر الباقة الاول','error');return;}
-  var newStart=dl(m.end_date)<0?new Date().toISOString().split('T')[0]:m.start_date;
+  var newStart=document.getElementById('rStart').value;
+  if(!newStart){toast('حدد تاريخ البداية','error');return;}
   var pkg=pkgs.find(function(p){return p.id===pkgId;});
   await sb('gym_members?id=eq.'+id,'PATCH',{package_id:pkgId,start_date:newStart,end_date:end,is_active:true,code_used_at:new Date().toISOString()});
   var updated=Object.assign({},m,{start_date:newStart,end_date:end,gym_packages:pkg});
