@@ -203,7 +203,8 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
     <div class="fg"><label>ملاحظة</label><textarea id="eNotes" placeholder="مثال: VIP / بيدفع كاش"></textarea></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAll()">الغاء</button>
-      <button class="btn-confirm" onclick="saveEdit()">حفظ</button>
+      <button class="btn-confirm" style="background:#25d366" onclick="saveEditAndSend()">حفظ وارسال واتساب</button>
+      <button class="btn-confirm" onclick="saveEdit()">حفظ فقط</button>
     </div>
   </div>
 </div>
@@ -531,6 +532,22 @@ async function saveAdd() {
   } catch(e) { toast('خطا: '+e.message,'error'); }
 }
 
+async function saveEditAndSend() {
+  var saved = await saveEdit(true);
+  if (!saved) return;
+  var m = members[editIdx];
+  var pkgId = document.getElementById('ePackage').value;
+  var pkg = pkgs.find(function(p){return p.id===pkgId;});
+  var updated = Object.assign({}, m, {
+    name: document.getElementById('eName').value.trim(),
+    phone: document.getElementById('ePhone').value.trim(),
+    start_date: document.getElementById('eStart').value,
+    end_date: document.getElementById('eEnd').value,
+    gym_packages: pkg
+  });
+  sendWelcome(updated);
+}
+
 var editIdx=null;
 function openEdit(i) {
   editIdx=i; var m=members[i];
@@ -558,7 +575,7 @@ function calcEdit() {
   base.setHours(0,0,0,0); base.setDate(base.getDate()+d);
   document.getElementById('eEnd').value=base.toISOString().split('T')[0];
 }
-async function saveEdit() {
+async function saveEdit(keepOpen) {
   var id=document.getElementById('eId').value;
   var name=document.getElementById('eName').value.trim();
   var phone=document.getElementById('ePhone').value.trim();
@@ -566,9 +583,11 @@ async function saveEdit() {
   var pkgId=document.getElementById('ePackage').value;
   var start=document.getElementById('eStart').value;
   var end=document.getElementById('eEnd').value;
-  if(!name||!pkgId||!start||!end){toast('اكمل جميع البيانات','error');return;}
+  if(!name||!pkgId||!start||!end){toast('اكمل جميع البيانات','error');return false;}
   await sb('gym_members?id=eq.'+id,'PATCH',{name:name,phone:phone,notes:notes||null,package_id:pkgId,start_date:start,end_date:end});
-  closeAll(); loadData(); toast('تم حفظ التعديلات','success');
+  if(!keepOpen) closeAll();
+  loadData(); toast('تم حفظ التعديلات','success');
+  return true;
 }
 
 var renewIdx=null;
