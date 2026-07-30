@@ -70,8 +70,19 @@ body.dark .dup-box{background:#2a1f00;border-color:#78350f;color:#fbbf24;}
 /* EXPORT */
 .export-btn{height:34px;padding:0 .9rem;background:var(--gray-lighter);border:1px solid var(--border);border-radius:17px;font-family:"Cairo",sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;color:var(--black);white-space:nowrap;}
 
+/* BULK SELECT */
+.bulk-bar{display:none;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:var(--gray-lighter);border-bottom:1px solid var(--border);gap:.6rem;flex-wrap:wrap;}
+.bulk-bar.show{display:flex;}
+.bulk-count{font-size:.8rem;font-weight:700;color:var(--black);}
+.bulk-actions{display:flex;gap:.4rem;flex-wrap:wrap;}
+.mcard-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--border);flex-shrink:0;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;color:var(--bg);font-size:.75rem;font-weight:900;background:var(--white);}
+.mcard-check.checked{background:var(--black);border-color:var(--black);}
+.mcard-body{flex:1;min-width:0;cursor:pointer;}
+.mcard.selecting{display:flex;gap:.65rem;align-items:flex-start;}
+.mcard.selected{background:var(--gray-lighter);}
+
 /* MEMBER CARD */
-.mcard{border-bottom:1px solid var(--gray-lighter);padding:.85rem 1rem;}
+.mcard{border-bottom:1px solid var(--gray-lighter);padding:.85rem 1rem;transition:background .12s;}
 .mcard:last-child{border-bottom:none;}
 .mcard-row1{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.45rem;}
 .mcard-name{font-size:.93rem;font-weight:700;}
@@ -93,7 +104,6 @@ body.dark .mcard-note{background:#0f1e3a;color:#93c5fd;}
 .btn-a.renew{background:var(--black);color:var(--bg);border-color:var(--black);}
 .btn-a.danger{color:var(--danger);border-color:#fecaca;}
 .btn-a.blue{color:#2563eb;border-color:#bfdbfe;}
-.btn-a.wa{background:#25d366;color:#fff;border-color:#25d366;}
 .btn-a.wa{background:#25d366;color:#fff;border-color:#25d366;}
 .empty{padding:3rem 1rem;text-align:center;color:var(--gray);font-size:.9rem;}
 
@@ -200,6 +210,15 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
     <div class="members-head">
       <input class="search-box" id="searchBar" placeholder="ابحث باسم او كود او رقم" oninput="filterAll()">
       <span class="search-count" id="searchCount"></span>
+      <button class="export-btn" id="selectModeBtn" onclick="toggleSelectMode()">تحديد</button>
+    </div>
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-count" id="bulkCount">0 محدد</span>
+      <div class="bulk-actions">
+        <button class="btn-a" onclick="selectAllVisible()">تحديد الكل</button>
+        <button class="btn-a" onclick="clearSelection()">الغاء التحديد</button>
+        <button class="btn-a danger" onclick="bulkDeleteSelected()">حذف المحدد</button>
+      </div>
     </div>
     <div id="membersList"><div class="no-alerts">جاري التحميل...</div></div>
   </div>
@@ -302,6 +321,7 @@ function toast(msg, type) {
 }
 
 var pkgs=[], members=[], alerts=[], activeFilter='all';
+var selectMode=false, selectedIds=new Set(), lastFilteredList=[];
 
 async function loadData() {
   try {
@@ -336,7 +356,6 @@ function render() {
 
   document.getElementById('sTotal').textContent = members.length;
   document.getElementById('sActive').textContent = active;
-  document.getElementById('sExpiring').textContent = expiring;
   document.getElementById('sExpired').textContent = expired;
   document.getElementById('sToday').textContent = todayCount;
   document.getElementById('sRevenue').textContent = totalRevenue.toLocaleString('ar-EG');
@@ -388,7 +407,52 @@ function renderFiltered() {
     return matchFilter && matchQ;
   });
   document.getElementById('searchCount').textContent = q||activeFilter!=='all' ? list.length+' عضو' : '';
+  lastFilteredList = list;
   renderList(list);
+}
+
+// Bulk select mode
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  if (!selectMode) selectedIds.clear();
+  document.getElementById('selectModeBtn').textContent = selectMode ? 'الغاء' : 'تحديد';
+  document.getElementById('bulkBar').classList.toggle('show', selectMode);
+  updateBulkCount();
+  renderFiltered();
+}
+function updateBulkCount() {
+  document.getElementById('bulkCount').textContent = selectedIds.size + ' محدد';
+}
+function toggleMemberSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+  updateBulkCount();
+  renderFiltered();
+}
+function selectAllVisible() {
+  lastFilteredList.forEach(function(m) { selectedIds.add(m.id); });
+  updateBulkCount();
+  renderFiltered();
+}
+function clearSelection() {
+  selectedIds.clear();
+  updateBulkCount();
+  renderFiltered();
+}
+async function bulkDeleteSelected() {
+  if (!selectedIds.size) { toast('محددش اي عضو', 'error'); return; }
+  if (!confirm('حذف '+selectedIds.size+' عضو نهائيا؟ الاجراء ده مينفعش يتراجع فيه.')) return;
+  var ids = Array.from(selectedIds);
+  try {
+    await Promise.all(ids.map(function(id) { return sb('gym_members?id=eq.'+id, 'DELETE'); }));
+    toast('تم حذف '+ids.length+' عضو', 'success');
+    selectedIds.clear();
+    selectMode = false;
+    document.getElementById('selectModeBtn').textContent = 'تحديد';
+    document.getElementById('bulkBar').classList.remove('show');
+    loadData();
+  } catch(e) {
+    toast('حصل خطأ اثناء الحذف', 'error');
+  }
 }
 
 function filterAll() { renderFiltered(); }
@@ -400,18 +464,27 @@ function renderList(list) {
   list.forEach(function(m) {
     var i=members.indexOf(m), d=dl(m.end_date);
     var pkgName = (m.gym_packages && m.gym_packages.name) ? m.gym_packages.name : '-';
-    html += '<div class="mcard" data-idx="'+i+'">';
+    var isSel = selectedIds.has(m.id);
+    html += '<div class="mcard'+(selectMode?' selecting':'')+(isSel?' selected':'')+'" data-idx="'+i+'">';
+    if (selectMode) {
+      html += '<div class="mcard-check'+(isSel?' checked':'')+'" onclick="toggleMemberSelect(\''+m.id+'\')">'+(isSel?'&#10003;':'')+'</div>';
+      html += '<div class="mcard-body" onclick="toggleMemberSelect(\''+m.id+'\')">';
+    }
     html += '<div class="mcard-row1"><div><div class="mcard-name">'+m.name+'</div><div class="mcard-code">'+m.code+'</div></div>'+badge(d)+'</div>';
     html += '<div class="mcard-meta"><span><b>'+pkgName+'</b></span><span>'+m.phone+'</span><span>حتى '+fmt(m.end_date)+'</span></div>';
     if (m.notes) html += '<div class="mcard-note">'+m.notes+'</div>';
-    html += '<div class="mcard-actions">';
-    html += '<button class="btn-a" onclick="openEdit('+i+')">تعديل</button>';
-    html += '<button class="btn-a renew" onclick="openRenew('+i+')">تجديد</button>';
-    if (d >= 0 && d <= 7) { html += '<button class="btn-a wa" onclick="remindMemberById(\''+m.id+'\')">تذكير واتساب</button>'; }
-    if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpiredById(\''+m.id+'\')">إشعار الانتهاء</button>'; }
-    if (m.fingerprint) { html += '<button class="btn-a blue" onclick="resetDev(\''+m.id+'\')">فك الجهاز</button>'; }
-    html += '<button class="btn-a danger" onclick="delMember(\''+m.id+'\')">حذف</button>';
-    html += '</div></div>';
+    if (!selectMode) {
+      html += '<div class="mcard-actions">';
+      html += '<button class="btn-a" onclick="openEdit('+i+')">تعديل</button>';
+      html += '<button class="btn-a renew" onclick="openRenew('+i+')">تجديد</button>';
+      if (d >= 0 && d <= 7) { html += '<button class="btn-a wa" onclick="remindMemberById(\''+m.id+'\')">تذكير واتساب</button>'; }
+      if (d < 0) { html += '<button class="btn-a wa" onclick="sendExpiredById(\''+m.id+'\')">إشعار الانتهاء</button>'; }
+      if (m.fingerprint) { html += '<button class="btn-a blue" onclick="resetDev(\''+m.id+'\')">فك الجهاز</button>'; }
+      html += '<button class="btn-a danger" onclick="delMember(\''+m.id+'\')">حذف</button>';
+      html += '</div>';
+    }
+    if (selectMode) html += '</div>';
+    html += '</div>';
   });
   el.innerHTML = html;
 }
