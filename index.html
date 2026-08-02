@@ -35,11 +35,16 @@ body{font-family:"Cairo",sans-serif;background:var(--bg);color:var(--black);min-
 body.dark .dup-box{background:#2a1f00;border-color:#78350f;color:#fbbf24;}
 
 /* STATS */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:.9rem;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.9rem;}
 .stats2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem;}
-.stat{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .5rem;text-align:center;transition:background .2s;}
-.stat-n{font-size:1.5rem;font-weight:900;line-height:1;}
-.stat-l{font-size:.68rem;color:var(--gray);margin-top:3px;}
+.stat{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .3rem;text-align:center;transition:background .15s,transform .1s,border-color .15s;}
+.stats .stat{cursor:pointer;}
+.stats .stat:active{transform:scale(.96);}
+.stats .stat:hover{border-color:var(--black);}
+.stat-n{font-size:1.35rem;font-weight:900;line-height:1;}
+.stat-l{font-size:.65rem;color:var(--gray);margin-top:3px;}
+.list-back-row{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);}
+.list-title{font-size:.85rem;font-weight:700;}
 
 /* SECTION */
 .section{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.9rem;overflow:hidden;transition:background .2s;}
@@ -192,37 +197,45 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
 </div>
 <div class="main">
   <div class="dup-box" id="dupWarning"><span></span></div>
-  <div class="stats">
-    <div class="stat"><div class="stat-n" id="sTotal" style="color:var(--black)">0</div><div class="stat-l">اجمالي</div></div>
-    <div class="stat"><div class="stat-n" id="sActive" style="color:var(--success)">0</div><div class="stat-l">نشطة</div></div>
-    <div class="stat"><div class="stat-n" id="sExpired" style="color:var(--danger)">0</div><div class="stat-l">منتهية</div></div>
-  </div>
-  <div class="stats2">
-    <div class="stat"><div class="stat-n" id="sToday" style="color:var(--info)">0</div><div class="stat-l">انضموا اليوم</div></div>
-    <div class="stat"><div class="stat-n" id="sRevenue" style="color:var(--success);font-size:1.2rem">0</div><div class="stat-l">إجمالي إيرادات النشطين</div></div>
-  </div>
-  <div class="section" id="alertsSection" style="display:none">
-    <div class="section-head">
-      <h2>تنتهي خلال 3 ايام</h2>
+  <div id="homeView">
+    <div class="stats">
+      <div class="stat" onclick="goToList('all')"><div class="stat-n" id="sTotal" style="color:var(--black)">0</div><div class="stat-l">اجمالي</div></div>
+      <div class="stat" onclick="goToList('active')"><div class="stat-n" id="sActive" style="color:var(--success)">0</div><div class="stat-l">نشطة</div></div>
+      <div class="stat" onclick="goToList('expiring')"><div class="stat-n" id="sExpiring" style="color:var(--warning)">0</div><div class="stat-l">قرب الانتهاء</div></div>
+      <div class="stat" onclick="goToList('expired')"><div class="stat-n" id="sExpired" style="color:var(--danger)">0</div><div class="stat-l">منتهية</div></div>
     </div>
-    <div id="alertsList"></div>
+    <div class="stats2">
+      <div class="stat"><div class="stat-n" id="sToday" style="color:var(--info)">0</div><div class="stat-l">انضموا اليوم</div></div>
+      <div class="stat"><div class="stat-n" id="sRevenue" style="color:var(--success);font-size:1.2rem">0</div><div class="stat-l">إجمالي إيرادات النشطين</div></div>
+    </div>
+    <div class="section" id="alertsSection" style="display:none">
+      <div class="section-head">
+        <h2>تنتهي خلال 3 ايام</h2>
+      </div>
+      <div id="alertsList"></div>
+    </div>
   </div>
-  <div class="section">
-    <div class="section-controls">
-      <div class="filters">
-        <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">الكل</button>
-        <button class="filter-btn" data-filter="active" onclick="setFilter('active')">نشط</button>
-        <button class="filter-btn" data-filter="expiring" onclick="setFilter('expiring')">ينتهي قريبا</button>
-        <button class="filter-btn" data-filter="expired" onclick="setFilter('expired')">منتهي</button>
-      </div>
-      <div class="members-head">
-        <input class="search-box" id="searchBar" placeholder="ابحث باسم او كود او رقم" oninput="filterAll()">
-        <span class="search-count" id="searchCount"></span>
-        <button class="export-btn" id="selectModeBtn" onclick="toggleSelectMode()">تحديد</button>
-      </div>
-      <div class="bulk-bar" id="bulkBar">
-        <span class="bulk-count" id="bulkCount">0 محدد</span>
-        <div class="bulk-actions">
+  <div id="listView" style="display:none">
+    <div class="section">
+      <div class="section-controls">
+        <div class="list-back-row">
+          <button class="btn-a" onclick="backToHome()">&#8594; الرئيسية</button>
+          <span class="list-title" id="listTitle">كل المشتركين</span>
+        </div>
+        <div class="filters">
+          <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">الكل</button>
+          <button class="filter-btn" data-filter="active" onclick="setFilter('active')">نشط</button>
+          <button class="filter-btn" data-filter="expiring" onclick="setFilter('expiring')">ينتهي قريبا</button>
+          <button class="filter-btn" data-filter="expired" onclick="setFilter('expired')">منتهي</button>
+        </div>
+        <div class="members-head">
+          <input class="search-box" id="searchBar" placeholder="ابحث باسم او كود او رقم" oninput="filterAll()">
+          <span class="search-count" id="searchCount"></span>
+          <button class="export-btn" id="selectModeBtn" onclick="toggleSelectMode()">تحديد</button>
+        </div>
+        <div class="bulk-bar" id="bulkBar">
+          <span class="bulk-count" id="bulkCount">0 محدد</span>
+          <div class="bulk-actions">
           <button class="btn-a" onclick="selectAllVisible()">تحديد الكل</button>
           <button class="btn-a" onclick="clearSelection()">الغاء التحديد</button>
           <button class="btn-a danger" onclick="bulkDeleteSelected()">حذف المحدد</button>
@@ -230,6 +243,7 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
       </div>
     </div>
     <div id="membersList"><div class="no-alerts">جاري التحميل...</div></div>
+  </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -375,6 +389,7 @@ function render() {
 
   document.getElementById('sTotal').textContent = members.length;
   document.getElementById('sActive').textContent = active;
+  document.getElementById('sExpiring').textContent = expiring;
   document.getElementById('sExpired').textContent = expired;
   document.getElementById('sToday').textContent = todayCount;
   document.getElementById('sRevenue').textContent = totalRevenue.toLocaleString('ar-EG');
@@ -414,6 +429,22 @@ function setFilter(f) {
     b.classList.toggle('active', b.dataset.filter === f);
   });
   renderFiltered();
+}
+
+var listTitles = { all: 'كل المشتركين', active: 'الأعضاء النشطين', expiring: 'قرب الانتهاء', expired: 'الأعضاء المنتهية' };
+function goToList(f) {
+  document.getElementById('homeView').style.display = 'none';
+  document.getElementById('listView').style.display = 'block';
+  document.getElementById('listTitle').textContent = listTitles[f] || 'كل المشتركين';
+  window.scrollTo(0, 0);
+  setFilter(f);
+}
+function backToHome() {
+  if (selectMode) toggleSelectMode();
+  document.getElementById('listView').style.display = 'none';
+  document.getElementById('homeView').style.display = 'block';
+  document.getElementById('searchBar').value = '';
+  window.scrollTo(0, 0);
 }
 
 function renderFiltered() {
@@ -812,6 +843,8 @@ function backToSelect() {
   currentGender = null;
   document.getElementById('genderScreen').style.display = 'flex';
   document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('listView').style.display = 'none';
+  document.getElementById('homeView').style.display = 'block';
 }
 
 // Init
