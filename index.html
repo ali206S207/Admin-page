@@ -81,6 +81,13 @@ body.dark .dup-box{background:#2a1f00;border-color:#78350f;color:#fbbf24;}
 .mcard.selecting{display:flex;gap:.65rem;align-items:flex-start;}
 .mcard.selected{background:var(--gray-lighter);}
 
+/* REVENUE */
+.rev-month{display:flex;align-items:center;justify-content:space-between;padding:.7rem .9rem;border-bottom:1px solid var(--gray-lighter);}
+.rev-month:last-child{border-bottom:none;}
+.rev-month-name{font-size:.85rem;font-weight:700;}
+.rev-month-count{font-size:.72rem;color:var(--gray);margin-top:2px;}
+.rev-month-amount{font-size:.95rem;font-weight:800;color:var(--success);}
+
 /* MEMBER CARD */
 .mcard{border-bottom:1px solid var(--gray-lighter);padding:.85rem 1rem;transition:background .12s;}
 .mcard:last-child{border-bottom:none;}
@@ -176,6 +183,7 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
   <button class="back-btn" onclick="backToSelect()">&#8592;</button>
   <span id="genderLabel" style="font-size:.8rem;font-weight:700;color:var(--gray)"></span>
   <div class="topbar-right">
+    <button class="btn-icon" onclick="openRevenueModal()" title="الإيرادات الشهرية">&#128176;</button>
     <button class="btn-icon" onclick="exportCSV()" title="تصدير CSV">&#8595;&#9141;</button>
     <button class="btn-icon" id="themeBtn" onclick="toggleTheme()">🌙</button>
     <button class="btn-icon" onclick="loadData()" title="تحديث">&#8635;</button>
@@ -274,6 +282,16 @@ body.dark .hint-green{background:#052e16;color:#4ade80;}
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAll()">الغاء</button>
       <button class="btn-confirm green" onclick="saveRenew()">تجديد وارسال واتساب</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="revenueModal">
+  <div class="modal">
+    <div class="handle"></div>
+    <div class="modal-title">الإيرادات الشهرية</div>
+    <div id="revenueMonthsList"><div class="empty">جاري التحميل...</div></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAll()">إغلاق</button>
     </div>
   </div>
 </div>
@@ -624,6 +642,7 @@ async function saveAdd() {
     var rows=await sb('gym_members','POST',{name:name,phone:phone,notes:notes||null,package_id:pkgId,start_date:start,end_date:end,code:newCode,is_active:true,code_used_at:new Date().toISOString(),gender:currentGender});
     var pkg=pkgs.find(function(p){return p.id===pkgId;});
     var nm=Object.assign({},rows[0],{gym_packages:pkg});
+    logRevenue(nm, pkg, 'new');
     closeAll(); await loadData(); toast('تم اضافة '+name,'success'); sendWelcome(nm);
   } catch(e) { toast('خطا: '+e.message,'error'); }
 }
@@ -722,10 +741,58 @@ async function saveRenew() {
   var pkg=pkgs.find(function(p){return p.id===pkgId;});
   await sb('gym_members?id=eq.'+id,'PATCH',{package_id:pkgId,start_date:newStart,end_date:end,is_active:true,code_used_at:new Date().toISOString()});
   var updated=Object.assign({},m,{start_date:newStart,end_date:end,gym_packages:pkg});
+  logRevenue(updated, pkg, 'renewal');
   closeAll(); await loadData(); toast('تم تجديد اشتراك '+m.name,'success'); sendRenewal(updated);
 }
 
 function closeAll() { document.querySelectorAll('.overlay').forEach(function(o){o.classList.remove('open');}); }
+
+// تسجيل عملية مالية (اشتراك جديد او تجديد) عشان نحسب الايرادات بالشهر بعدين
+async function logRevenue(member, pkg, type) {
+  try {
+    await sb('revenue_log', 'POST', {
+      member_id: member.id || null,
+      member_name: member.name,
+      package_name: pkg ? pkg.name : null,
+      amount: pkg ? pkg.price : 0,
+      gender: currentGender,
+      type: type
+    });
+  } catch (e) { /* تسجيل الايراد اختياري، ميوقفش باقي العملية لو فشل */ }
+}
+
+var arMonths = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
+
+async function openRevenueModal() {
+  document.getElementById('revenueModal').classList.add('open');
+  document.getElementById('revenueMonthsList').innerHTML = '<div class="empty">جاري التحميل...</div>';
+  try {
+    var rows = await sb('revenue_log?select=amount,created_at&order=created_at.desc');
+    var byMonth = {};
+    rows.forEach(function(r) {
+      var d = new Date(r.created_at);
+      var key = d.getFullYear() + '-' + (d.getMonth() + 1);
+      if (!byMonth[key]) byMonth[key] = { total: 0, count: 0, year: d.getFullYear(), month: d.getMonth() };
+      byMonth[key].total += Number(r.amount) || 0;
+      byMonth[key].count += 1;
+    });
+    var keys = Object.keys(byMonth).sort(function(a, b) {
+      return byMonth[b].year - byMonth[a].year || byMonth[b].month - byMonth[a].month;
+    });
+    if (!keys.length) {
+      document.getElementById('revenueMonthsList').innerHTML = '<div class="empty">لسه مفيش عمليات مسجلة</div>';
+      return;
+    }
+    var html = '';
+    keys.forEach(function(k) {
+      var m = byMonth[k];
+      html += '<div class="rev-month"><div><div class="rev-month-name">' + arMonths[m.month] + ' ' + m.year + '</div><div class="rev-month-count">' + m.count + ' عملية</div></div><div class="rev-month-amount">' + m.total.toLocaleString('ar-EG') + ' جنيه</div></div>';
+    });
+    document.getElementById('revenueMonthsList').innerHTML = html;
+  } catch (e) {
+    document.getElementById('revenueMonthsList').innerHTML = '<div class="empty">تعذر تحميل الايرادات (تأكد ان جدول revenue_log متعمول)</div>';
+  }
+}
 async function resetDev(id) { if(!confirm('هتفك ارتباط الجهاز؟')) return; await sb('gym_members?id=eq.'+id,'PATCH',{fingerprint:null,code_used_at:null}); loadData(); toast('تم فك الجهاز','success'); }
 async function delMember(id) { if(!confirm('حذف العضو نهائيا؟')) return; await sb('gym_members?id=eq.'+id,'DELETE'); loadData(); toast('تم الحذف','success'); }
 document.querySelectorAll('.overlay').forEach(function(o){ o.addEventListener('click',function(e){if(e.target===o)closeAll();}); });
